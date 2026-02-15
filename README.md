@@ -117,55 +117,53 @@ The application opens at `http://localhost:8501`.
 ## Project Structure
 
 ```
-Project_1/
-├── run_app.sh                          # Launch script
-├── analytics_workbench/
-│   ├── app.py                          # Main Streamlit application
-│   ├── requirements.txt                # Python dependencies
-│   ├── README.md                       # This file
-│   ├── QUICKSTART.md                   # Quick start guide
-│   │
-│   ├── core/                           # Data processing modules
-│   │   ├── data_loader.py              # Dataset loading and management
-│   │   ├── preprocessing.py            # Missing values, scaling, encoding, splitting
-│   │   ├── visualization.py            # Plotly-based visualizations
-│   │   └── outliers.py                 # Outlier detection methods
-│   │
-│   ├── models/                         # Model implementations
-│   │   ├── __init__.py                 # Registry, factory, supported tasks map
-│   │   ├── base_model.py              # Abstract base class (build/train/predict/save/load)
-│   │   ├── sklearn/                    # Scikit-Learn models
-│   │   │   ├── linear_regression.py    # Regression only
-│   │   │   ├── logistic_regression.py  # Classification only
-│   │   │   ├── random_forest.py        # Classification + Regression
-│   │   │   ├── extra_trees.py          # Classification + Regression
-│   │   │   ├── svm.py                  # Classification + Regression
-│   │   │   └── knn.py                  # Classification + Regression
-│   │   ├── keras/                      # Keras/TensorFlow models
-│   │   │   ├── keras_mlp.py
-│   │   │   ├── keras_cnn.py
-│   │   │   ├── keras_rnn.py
-│   │   │   ├── keras_lstm.py
-│   │   │   └── keras_gru.py
-│   │   └── pytorch/                    # PyTorch models
-│   │       ├── pytorch_mlp.py
-│   │       ├── pytorch_cnn.py
-│   │       ├── pytorch_rnn.py
-│   │       ├── pytorch_lstm.py
-│   │       └── pytorch_gru.py
-│   │
-│   ├── utils/
-│   │   └── helpers.py                  # JSON/YAML/joblib save/load utilities
-│   │
-│   ├── sample_data/                    # Sample datasets
-│   │   ├── generate_samples.py
-│   │   ├── iris.csv
-│   │   ├── classification_dataset.csv
-│   │   ├── regression_dataset.csv
-│   │   └── timeseries_dataset.csv
-│   │
-│   ├── saved_models/                   # Saved model weights and configs
-│   └── session_data/                   # Session persistence (auto-generated)
+analytics_workbench/
+├── app.py                          # Main Streamlit application
+├── requirements.txt                # Python dependencies
+├── README.md                       # This file
+├── QUICKSTART.md                   # Quick start guide
+│
+├── core/                           # Data processing modules
+│   ├── data_loader.py              # Dataset loading and management
+│   ├── preprocessing.py            # Missing values, scaling, encoding, splitting
+│   ├── visualization.py            # Plotly-based visualizations
+│   └── outliers.py                 # Outlier detection methods
+│
+├── models/                         # Model implementations
+│   ├── __init__.py                 # Registry, factory, supported tasks map
+│   ├── base_model.py              # Abstract base class (build/train/predict/save/load)
+│   ├── sklearn/                    # Scikit-Learn models
+│   │   ├── linear_regression.py    # Regression only
+│   │   ├── logistic_regression.py  # Classification only
+│   │   ├── random_forest.py        # Classification + Regression
+│   │   ├── extra_trees.py          # Classification + Regression
+│   │   ├── svm.py                  # Classification + Regression
+│   │   └── knn.py                  # Classification + Regression
+│   ├── keras/                      # Keras/TensorFlow models
+│   │   ├── keras_mlp.py
+│   │   ├── keras_cnn.py
+│   │   ├── keras_rnn.py
+│   │   ├── keras_lstm.py
+│   │   └── keras_gru.py
+│   └── pytorch/                    # PyTorch models
+│       ├── pytorch_mlp.py
+│       ├── pytorch_cnn.py
+│       ├── pytorch_rnn.py
+│       ├── pytorch_lstm.py
+│       └── pytorch_gru.py
+│
+├── utils/
+│   └── helpers.py                  # JSON/YAML/joblib save/load utilities
+│
+├── sample_data/                    # Sample datasets
+│   ├── generate_samples.py
+│   ├── iris.csv
+│   ├── classification_dataset.csv
+│   ├── regression_dataset.csv
+│   └── timeseries_dataset.csv
+│
+├── saved_models/                   # Saved model weights and configs
+└── session_data/                   # Session persistence (auto-generated)
 ```
 
 ## Architecture
