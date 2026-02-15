@@ -2,6 +2,8 @@
 
 A modular machine learning platform built with Python and Streamlit. Provides end-to-end ML workflows from data loading to model deployment.
 
+![Alt text](img/framework_screenshot.png)
+
 ## Features
 
 ### Dataset Management
