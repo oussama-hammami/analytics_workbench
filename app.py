@@ -12,12 +12,30 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+from pathlib import Path
 from typing import Optional, Any
 import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
 import json
+
+# ── Install gate ──────────────────────────────────────────────────────────────
+# Must run before any heavy imports and before the first st.* call.
+_INSTALLED = (Path(__file__).parent / ".installed").exists()
+
+st.set_page_config(
+    page_title="Analytics Workbench — Setup" if not _INSTALLED
+               else "Comprehensive Modular AI/ML Platform",
+    page_icon="⚙️" if not _INSTALLED else "🤖",
+    layout="wide",
+    initial_sidebar_state="collapsed" if not _INSTALLED else "expanded",
+)
+
+if not _INSTALLED:
+    from install.wizard import render_wizard as _render_wizard
+    _render_wizard()
+    st.stop()
 
 # Import core modules
 from core.data_loader import DatasetManager
@@ -50,15 +68,6 @@ seed_superadmin()  # reads ADMIN_EMAIL / ADMIN_PASSWORD from .env
 # Base directory for saving/loading models (absolute, next to app.py)
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SAVE_DIR = os.path.join(_APP_DIR, "saved_models")
-from pathlib import Path
-
-# Page configuration
-st.set_page_config(
-    page_title="Comprehensive Modular AI/ML Platform",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Persistence directory
 PERSISTENCE_DIR = Path("./session_data")

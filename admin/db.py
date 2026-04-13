@@ -28,7 +28,8 @@ _DEFAULT_DB = Path(__file__).parent.parent / "data" / "analytics_workbench.db"
 
 
 def _db_path() -> Path:
-    return Path(os.getenv("DB_PATH", str(_DEFAULT_DB)))
+    val = os.getenv("DB_PATH", "").strip()
+    return Path(val) if val else _DEFAULT_DB
 
 
 # ── Public helpers ────────────────────────────────────────────────────────────
