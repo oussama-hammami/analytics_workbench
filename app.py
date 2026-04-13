@@ -45,7 +45,7 @@ from admin.db import ensure_admin_schema, seed_superadmin
 
 # Bootstrap SQLite DB on every cold start (idempotent — safe to call always)
 ensure_admin_schema()
-seed_superadmin(email="admin", password="admin")
+seed_superadmin()  # reads ADMIN_EMAIL / ADMIN_PASSWORD from .env
 
 # Base directory for saving/loading models (absolute, next to app.py)
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))

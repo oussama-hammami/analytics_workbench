@@ -14,13 +14,13 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*"; exit 1; }
 [[ $EUID -eq 0 ]] || error "This script must be run as root:  sudo bash db_setup.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ENV="$SCRIPT_DIR/app.env"
-PYTHON="$SCRIPT_DIR/.env/bin/python3"
+APP_ENV="$SCRIPT_DIR/.env"
+PYTHON="$SCRIPT_DIR/.venv/bin/python3"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DB_NAME="analytics_workbench"
 DB_USER="aw_user"
-DB_PASS="a0S47pU_HujRMXstPAD8Ug"   # generated — change if you like
+DB_PASS="$(openssl rand -hex 16 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(16))")"
 DB_PREFIX="aw_"
 
 # ── Step 1: Create DB and app user ────────────────────────────────────────────
@@ -69,8 +69,8 @@ SQL
 
 success "Superadmin '${ADMIN_EMAIL}' created."
 
-# ── Step 4: Update app.env ────────────────────────────────────────────────────
-info "Updating app.env with new DB credentials…"
+# ── Step 4: Update .env ───────────────────────────────────────────────────────
+info "Updating .env with new DB credentials…"
 
 if [[ -f "$APP_ENV" ]]; then
     # Update DB credentials in-place
@@ -78,31 +78,35 @@ if [[ -f "$APP_ENV" ]]; then
     sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${DB_PASS}|"  "$APP_ENV"
     sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${DB_NAME}|"  "$APP_ENV"
 else
-    # Write fresh app.env
-    APP_SECRET_KEY=$("$PYTHON" -c "import secrets; print(secrets.token_hex(32))")
+    # Write fresh .env
+    APP_SECRET_KEY=$("$PYTHON" -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null \
+        || openssl rand -hex 32)
     cat > "$APP_ENV" <<EOF
+# Analytics Workbench — Environment Configuration
+# Keep this file secret. Do NOT commit it to version control.
+
 APP_NAME="Analytics Workbench"
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=http://localhost
 APP_SECRET_KEY=${APP_SECRET_KEY}
 
-DB_CONNECTION=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=${DB_NAME}
-DB_USERNAME=${DB_USER}
-DB_PASSWORD=${DB_PASS}
+# SQLite database path (leave blank to use default: data/analytics_workbench.db)
+DB_PATH=
 DB_PREFIX=${DB_PREFIX}
 
 STREAMLIT_SERVER_PORT=8501
 STREAMLIT_SERVER_ADDRESS=0.0.0.0
 STREAMLIT_SERVER_HEADLESS=true
 STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+# Initial superadmin — only applied on first launch when no superadmin exists
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASS}
 EOF
 fi
 
-success "app.env updated."
+success ".env updated."
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
@@ -110,7 +114,7 @@ echo -e "${BOLD}═════════════════════�
 echo -e "  ${GREEN}Setup complete!${RESET}"
 echo -e "  Admin email : ${ADMIN_EMAIL}"
 echo -e "  DB user     : ${DB_USER}"
-echo -e "  DB password : ${DB_PASS}  (saved in app.env)"
+echo -e "  DB password : ${DB_PASS}  (saved in .env)"
 echo -e "${BOLD}════════════════════════════════════════${RESET}"
 echo ""
 echo "  Now launch the app:"

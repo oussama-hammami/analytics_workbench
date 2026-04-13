@@ -12,11 +12,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Tuple
 
-# ── Load app.env if present ──────────────────────────────────────────────────
+# ── Load .env / app.env if present ───────────────────────────────────────────
 try:
     from dotenv import load_dotenv
     _root = Path(__file__).parent.parent
-    for _candidate in (_root / "app.env", _root / ".env"):
+    for _candidate in (_root / ".env", _root / "app.env"):
         if _candidate.is_file():
             load_dotenv(_candidate, override=False)
             break
@@ -120,8 +120,18 @@ def ensure_admin_schema() -> None:
         """)
 
 
-def seed_superadmin(email: str = "admin", password: str = "admin") -> None:
-    """Insert a default superadmin if none exists yet."""
+def seed_superadmin() -> None:
+    """Insert a default superadmin if none exists yet.
+
+    Credentials are read from the ADMIN_EMAIL and ADMIN_PASSWORD environment
+    variables (set in .env).  This function is a no-op after the first run.
+    """
+    email    = os.getenv("ADMIN_EMAIL", "admin")
+    password = os.getenv("ADMIN_PASSWORD", "")
+
+    if not password:
+        return  # refuse to seed an account with no password
+
     p = os.getenv("DB_PREFIX", "aw_")
     with get_db() as (_, cur):
         cur.execute(f'SELECT COUNT(*) FROM "{p}users" WHERE role="superadmin"')

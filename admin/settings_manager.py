@@ -132,11 +132,11 @@ def render_settings_manager() -> None:
     st.markdown("---")
 
     # ── .env inspector ────────────────────────────────────────────────────────
-    st.subheader("📄 Environment File (app.env)")
+    st.subheader("📄 Environment File (.env)")
     env_path = next(
         (p for p in (
-            Path(__file__).parent.parent / "app.env",
             Path(__file__).parent.parent / ".env",
+            Path(__file__).parent.parent / "app.env",
         ) if p.is_file()),
         None,
     )
@@ -153,4 +153,4 @@ def render_settings_manager() -> None:
                 masked.append(line)
         st.code("\n".join(masked), language="ini")
     else:
-        st.info("No app.env file found.")
+        st.info("No .env file found. Copy .env.example to .env and fill in your values.")

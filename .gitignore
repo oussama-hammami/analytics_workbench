@@ -1,8 +1,7 @@
 # Python virtual environment
-.env/
+.venv/
 venv/
 env/
-.venv/
 
 # Python cache
 __pycache__/
@@ -18,6 +17,7 @@ build/
 *.egg
 
 # Environment & secrets
+.env
 app.env
 .env.local
 *.env

@@ -13,7 +13,13 @@ from .db import get_db, table, ensure_admin_schema
 
 def _fernet():
     from cryptography.fernet import Fernet
-    secret = os.getenv("APP_SECRET_KEY", "default-insecure-key-change-me")
+    secret = os.getenv("APP_SECRET_KEY", "")
+    if not secret:
+        st.error(
+            "APP_SECRET_KEY is not set. Add it to your .env file before storing API keys.",
+            icon="🔐",
+        )
+        st.stop()
     key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
     return Fernet(key)
 

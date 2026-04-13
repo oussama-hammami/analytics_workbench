@@ -42,7 +42,7 @@ Train models. Explore data. Own your infrastructure. No cloud bills. No data lea
 [*] Full Python source code (Streamlit, scikit-learn, Keras, PyTorch)
 [*] Admin module: auth, RBAC, dashboard, user management, API key vault, settings
 [*] `setup.sh` one-command installer with `--run-only` and `--reset-admin` flags
-[*] `app.env.example` configuration template
+[*] `.env.example` configuration template
 [*] Sample datasets for immediate testing
 [*] Complete technical documentation (PDF + Markdown)
 [*] `systemd` service configuration for production deployment
@@ -182,7 +182,7 @@ Clean modular architecture — each feature lives in its own file. Easy to exten
 | Full source code | Python, Streamlit, scikit-learn, Keras, PyTorch |
 | Admin module | Auth, RBAC, dashboard, users, API vault, settings |
 | Installer | `setup.sh` with `--run-only` and `--reset-admin` flags |
-| Configuration | `app.env.example` template |
+| Configuration | `.env.example` template |
 | Sample data | Ready-to-use test datasets |
 | Documentation | Complete technical manual (Markdown + PDF) |
 | Production config | `systemd` service unit for background deployment |

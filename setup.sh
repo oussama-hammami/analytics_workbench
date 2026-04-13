@@ -24,19 +24,19 @@ step_skip() { echo -e "${YELLOW}[SKIP]${RESET}  $*"; }
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$SCRIPT_DIR/.env"
+VENV_DIR="$SCRIPT_DIR/.venv"
 PYTHON="$VENV_DIR/bin/python3"
 PIP="$VENV_DIR/bin/pip"
 STREAMLIT="$VENV_DIR/bin/streamlit"
-APP_ENV="$SCRIPT_DIR/app.env"
-ENV_EXAMPLE="$SCRIPT_DIR/app.env.example"
+APP_ENV="$SCRIPT_DIR/.env"
+ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
 
 cd "$SCRIPT_DIR"
 
 # ── Flags ─────────────────────────────────────────────────────────────────────
 MODE="${1:-setup}"   # setup | --run-only | --reset-admin
 
-# ── Helper: load app.env into current shell ───────────────────────────────────
+# ── Helper: load .env into current shell ─────────────────────────────────────
 load_env() {
     if [[ -f "$APP_ENV" ]]; then
         # Export each non-comment, non-empty line
@@ -208,11 +208,11 @@ fi
 
 # Venv
 if [[ ! -x "$PYTHON" ]]; then
-    info "Creating virtual environment at .env/ …"
+    info "Creating virtual environment at .venv/ …"
     python3 -m venv "$VENV_DIR" || error "Failed to create virtual environment."
     success "Virtual environment created."
 else
-    success "Virtual environment found at .env/"
+    success "Virtual environment found at .venv/"
 fi
 
 # =============================================================================
@@ -231,28 +231,34 @@ else
 fi
 
 # =============================================================================
-#  STEP 2 — Configure app.env
+#  STEP 2 — Configure .env
 # =============================================================================
 header "STEP 2 · Environment configuration"
 
 if [[ -f "$APP_ENV" ]]; then
-    step_skip "app.env already exists."
-    warn "To reconfigure, delete app.env and re-run this script."
+    step_skip ".env already exists."
+    warn "To reconfigure, delete .env and re-run this script."
     load_env
 else
-    [[ -f "$ENV_EXAMPLE" ]] || error "app.env.example not found."
+    [[ -f "$ENV_EXAMPLE" ]] || error ".env.example not found."
 
     echo ""
-    echo -e "${BOLD}MySQL connection details${RESET}  (Enter = use default)"
+    echo -e "${BOLD}Application settings${RESET}  (Enter = use default)"
     echo ""
 
-    read -rp "  DB Host     [localhost]           : " DB_HOST;     DB_HOST="${DB_HOST:-localhost}"
-    read -rp "  DB Port     [3306]                : " DB_PORT;     DB_PORT="${DB_PORT:-3306}"
-    read -rp "  DB Name     [analytics_workbench] : " DB_DATABASE; DB_DATABASE="${DB_DATABASE:-analytics_workbench}"
-    read -rp "  DB Username [root]                : " DB_USERNAME; DB_USERNAME="${DB_USERNAME:-root}"
-    read -srp " DB Password                       : " DB_PASSWORD; echo ""; DB_PASSWORD="${DB_PASSWORD:-}"
     read -rp "  Table Prefix [aw_]                : " DB_PREFIX;   DB_PREFIX="${DB_PREFIX:-aw_}"
     read -rp "  App URL [http://localhost]         : " APP_URL;     APP_URL="${APP_URL:-http://localhost}"
+
+    echo ""
+    echo -e "${BOLD}Initial superadmin account${RESET}  (used only on the very first launch)"
+    echo ""
+    read -rp "  Admin Email    [admin@example.com] : " _ADMIN_EMAIL; _ADMIN_EMAIL="${_ADMIN_EMAIL:-admin@example.com}"
+    while true; do
+        read -srp " Admin Password (min 8 chars)      : " _ADMIN_PASS;  echo ""
+        read -srp " Confirm Password                  : " _ADMIN_PASS2; echo ""
+        [[ "$_ADMIN_PASS" == "$_ADMIN_PASS2" && ${#_ADMIN_PASS} -ge 8 ]] && break
+        warn "Passwords do not match or are too short. Try again."
+    done
 
     APP_SECRET_KEY=$("$PYTHON" -c "import secrets; print(secrets.token_hex(32))")
 
@@ -267,22 +273,23 @@ APP_DEBUG=false
 APP_URL=${APP_URL}
 APP_SECRET_KEY=${APP_SECRET_KEY}
 
-DB_CONNECTION=mysql
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT}
-DB_DATABASE=${DB_DATABASE}
-DB_USERNAME=${DB_USERNAME}
-DB_PASSWORD=${DB_PASSWORD}
+# SQLite database path (leave blank to use default: data/analytics_workbench.db)
+DB_PATH=
 DB_PREFIX=${DB_PREFIX}
 
+# Streamlit server
 STREAMLIT_SERVER_PORT=8501
 STREAMLIT_SERVER_ADDRESS=0.0.0.0
 STREAMLIT_SERVER_HEADLESS=true
 STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+# Initial superadmin — only applied on first launch when no superadmin exists
+ADMIN_EMAIL=${_ADMIN_EMAIL}
+ADMIN_PASSWORD=${_ADMIN_PASS}
 EOF
 
     load_env
-    success "app.env written."
+    success ".env written."
 fi
 
 # =============================================================================
@@ -300,7 +307,7 @@ else
     if ! mysql_reachable; then
         warn "MySQL is not reachable. Attempting to start the service…"
         if try_start_mysql; then
-            mysql_reachable || error "MySQL started but connection still failed. Check credentials in app.env."
+            mysql_reachable || error "MySQL started but connection still failed. Check credentials in .env."
         else
             warn "Could not start MySQL automatically."
             echo ""
@@ -337,7 +344,7 @@ fi
 # =============================================================================
 header "STEP 4 · Superadmin account"
 
-ADMIN_EMAIL="${ADMIN_EMAIL:-}"   # may already be set from app.env
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"   # may already be set from .env
 
 if [[ "$MYSQL_AVAILABLE" == "false" ]]; then
     step_skip "MySQL not available — skipping admin account creation."
@@ -358,7 +365,7 @@ else
             -u"${DB_USERNAME:-root}" ${DB_PASSWORD:+-p"${DB_PASSWORD}"} \
             "${DB_DATABASE:-analytics_workbench}" -sNe \
             "SELECT email FROM \`${DB_PREFIX:-aw_}users\` WHERE role='superadmin' LIMIT 1;" \
-            2>/dev/null || echo "see app.env")
+            2>/dev/null || echo "see .env")
     else
         echo ""
         echo -e "${BOLD}Create your superadmin account${RESET}"
