@@ -1,0 +1,18 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Analytics Workbench Installer — Apache Security Rules
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Only allow access to index.php; block everything else in this directory
+<FilesMatch "^(?!index\.php$)">
+  Order Allow,Deny
+  Deny from all
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes
+
+# Prevent caching of installer
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-store, no-cache, must-revalidate"
+  Header set Pragma "no-cache"
+</IfModule>

@@ -29,6 +29,24 @@ from utils.helpers import save_object, load_object, save_json
 import pickle
 import os as os_module
 
+# ── Admin / Auth module ───────────────────────────────────────────────────────
+from admin import (
+    is_authenticated,
+    is_admin,
+    get_current_user,
+    render_login_page,
+    logout,
+    render_user_management,
+    render_settings_manager,
+    render_api_keys,
+    render_dashboard,
+)
+from admin.db import ensure_admin_schema, seed_superadmin
+
+# Bootstrap SQLite DB on every cold start (idempotent — safe to call always)
+ensure_admin_schema()
+seed_superadmin(email="admin", password="admin")
+
 # Base directory for saving/loading models (absolute, next to app.py)
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SAVE_DIR = os.path.join(_APP_DIR, "saved_models")
@@ -147,24 +165,82 @@ if 'state_loaded' not in st.session_state:
     load_session_state()
     st.session_state.state_loaded = True
 
+# ── Authentication gate ───────────────────────────────────────────────────────
+# Renders the login page and stops execution until the user is authenticated.
+if not is_authenticated():
+    render_login_page()
+    st.stop()
+
+# ── Maintenance mode check ────────────────────────────────────────────────────
+# Regular users are blocked when maintenance mode is active.
+def _check_maintenance():
+    if is_admin():
+        return  # admins always pass through
+    try:
+        from admin.db import get_db, table, is_configured
+        if not is_configured():
+            return
+        with get_db() as (_, cur):
+            cur.execute(
+                f"SELECT setting_value FROM {table('settings')} "
+                f"WHERE setting_key='maintenance_mode' LIMIT 1"
+            )
+            row = cur.fetchone()
+        if row and row.get("setting_value") == "1":
+            st.warning("🔧 The platform is currently under maintenance. Please check back later.")
+            st.stop()
+    except Exception:
+        pass  # Non-fatal
+
+_check_maintenance()
+
 # Main title
+_current_user = get_current_user()
 st.title("🤖 Comprehensive Modular AI/ML Platform")
 st.markdown("---")
 
+# ── Sidebar: user identity + logout ──────────────────────────────────────────
+with st.sidebar:
+    _u = get_current_user()
+    if _u:
+        role_badge = {"superadmin": "🔴", "admin": "🟡", "viewer": "🟢"}.get(
+            _u.get("role", ""), "⚪"
+        )
+        st.markdown(
+            f"<div style='padding:8px 0 4px'>"
+            f"<span style='font-size:.8rem;color:#94a3b8'>Signed in as</span><br>"
+            f"<b>{_u['name']}</b>&nbsp;{role_badge} "
+            f"<span style='font-size:.75rem;color:#64748b'>{_u['role']}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("🚪 Sign Out", use_container_width=True):
+            logout()
+
 # Sidebar navigation
 st.sidebar.title("Navigation")
+
+_platform_pages = [
+    "📁 Dataset Management",
+    "🔍 Data Exploration",
+    "📊 Visualization",
+    "🚨 Outlier Detection",
+    "⚙️ Preprocessing",
+    "🎯 Model Training",
+    "📈 Model Evaluation",
+    "🔮 Prediction",
+]
+
+_admin_pages = [
+    "📊 Dashboard",
+    "👥 User Management",
+    "⚙️ Site Settings",
+    "🔑 API Keys",
+] if is_admin() else []
+
 page = st.sidebar.radio(
     "Select a module:",
-    [
-        "📁 Dataset Management",
-        "🔍 Data Exploration",
-        "📊 Visualization",
-        "🚨 Outlier Detection",
-        "⚙️ Preprocessing",
-        "🎯 Model Training",
-        "📈 Model Evaluation",
-        "🔮 Prediction"
-    ]
+    _platform_pages + (_admin_pages and ["─── Admin ───"] + _admin_pages or []),
 )
 
 # Session persistence controls
@@ -1042,6 +1118,25 @@ elif page == "🔮 Prediction":
                     st.error(f"Error: {str(e)}")
     elif not available_models:
         st.warning("⚠️ No saved models found. Train and save a model first.")
+
+# ============================================================================
+# ADMIN PAGES  (only reachable by users with admin / superadmin role)
+# ============================================================================
+elif page == "📊 Dashboard":
+    render_dashboard()
+
+elif page == "👥 User Management":
+    render_user_management()
+
+elif page == "⚙️ Site Settings":
+    render_settings_manager()
+
+elif page == "🔑 API Keys":
+    render_api_keys()
+
+# ─── Separator pages (non-selectable dividers in radio) ──────────────────────
+elif page == "─── Admin ───":
+    st.info("Select an admin module from the sidebar.")
 
 # Footer
 st.markdown("---")
