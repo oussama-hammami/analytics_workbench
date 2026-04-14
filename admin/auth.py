@@ -1,16 +1,30 @@
 """
 Authentication & Role-Based Access Control (RBAC).
+
+Roles
+-----
+superadmin  Full system access (user management, settings, all analytics).
+admin       Manage users and settings; full analytics access.
+manager     Create and edit analytics (datasets, preprocessing, model training).
+viewer      Read-only access to dashboards and analytics outputs.
 """
 from __future__ import annotations
 
+import html as _html
+import secrets
 from typing import Optional, Tuple
 import streamlit as st
 from .db import get_db, table, is_configured
 
 ROLE_SUPERADMIN = "superadmin"
 ROLE_ADMIN      = "admin"
+ROLE_MANAGER    = "manager"
 ROLE_VIEWER     = "viewer"
-ADMIN_ROLES     = {ROLE_SUPERADMIN, ROLE_ADMIN}
+
+# Roles that may access the admin control panel.
+ADMIN_ROLES    = {ROLE_SUPERADMIN, ROLE_ADMIN}
+# Roles that may create / edit analytics content.
+MANAGER_ROLES  = {ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_MANAGER}
 
 
 def _hash_password(plain: str) -> str:
@@ -26,6 +40,8 @@ def _verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+# ── Session helpers ──────────────────────────────────────────────────────────
+
 def get_current_user() -> Optional[dict]:
     return st.session_state.get("auth_user")
 
@@ -39,10 +55,60 @@ def is_admin() -> bool:
     return user is not None and user.get("role") in ADMIN_ROLES
 
 
+def is_manager() -> bool:
+    """True for superadmin, admin, and manager roles."""
+    user = get_current_user()
+    return user is not None and user.get("role") in MANAGER_ROLES
+
+
+# ── Access guards ────────────────────────────────────────────────────────────
+
+def require_auth() -> None:
+    """Stop execution if the user is not logged in."""
+    if not is_authenticated():
+        st.error("🔒 Please sign in to access this page.")
+        st.stop()
+
+
 def require_admin() -> None:
+    """Stop execution unless the user holds an admin role."""
+    require_auth()
     if not is_admin():
         st.error("🔒 Access denied — Admin role required.")
         st.stop()
+
+
+def require_manager_or_above() -> None:
+    """Stop execution unless the user can create / edit analytics content."""
+    require_auth()
+    if not is_manager():
+        st.error("🔒 Access denied — Manager role or higher required.")
+        st.stop()
+
+
+# ── CSRF token utilities ─────────────────────────────────────────────────────
+# Streamlit uses a persistent WebSocket session (state is server-side), so
+# classic cookie-based CSRF cannot occur.  These helpers add a defense-in-depth
+# nonce that prevents replay attacks and session-fixation edge cases.
+
+def _init_csrf_token() -> None:
+    """Ensure a CSRF token exists for the current Streamlit session."""
+    if "_aw_csrf" not in st.session_state:
+        st.session_state["_aw_csrf"] = secrets.token_hex(32)
+
+
+def get_csrf_token() -> str:
+    """Return the session-scoped CSRF token, creating it if absent."""
+    _init_csrf_token()
+    return st.session_state["_aw_csrf"]
+
+
+def validate_csrf_token(token: str) -> bool:
+    """Constant-time comparison of *token* against the session's CSRF token."""
+    expected = st.session_state.get("_aw_csrf", "")
+    if not expected:
+        return False
+    return secrets.compare_digest(expected, token)
 
 
 def login(email: str, password: str) -> Tuple[bool, str]:
@@ -82,7 +148,9 @@ def login(email: str, password: str) -> Tuple[bool, str]:
         "role":      row["role"],
         "is_active": row["is_active"],
     }
-    return True, f"Welcome back, {row['name']}!"
+    # Rotate CSRF token on every new login.
+    st.session_state["_aw_csrf"] = secrets.token_hex(32)
+    return True, f"Welcome back, {_html.escape(row['name'])}!"
 
 
 def logout() -> None:
@@ -97,6 +165,10 @@ def render_login_page() -> None:
     #MainMenu, footer { display:none !important; }
     [data-testid="stAppViewContainer"] > .main { background:#0f172a; }
     </style>""", unsafe_allow_html=True)
+
+    # Bind a CSRF nonce to this page-load so it can be verified on submit.
+    _init_csrf_token()
+    _page_csrf = st.session_state["_aw_csrf"]
 
     _, col, _ = st.columns([1, 1.2, 1])
     with col:
@@ -118,6 +190,10 @@ def render_login_page() -> None:
             submitted = st.form_submit_button("Sign In", use_container_width=True, type="primary")
 
         if submitted:
+            # CSRF guard: token must match the one set when this page loaded.
+            if not validate_csrf_token(_page_csrf):
+                st.error("Session error — please refresh and try again.")
+                st.stop()
             if not email or not password:
                 st.error("Please enter your email and password.")
             else:

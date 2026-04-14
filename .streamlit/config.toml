@@ -1,0 +1,8 @@
+[client]
+# Hide raw Python stack traces from end-users.
+# Detailed errors are written to logs/ by the application's own error handler.
+showErrorDetails = false
+
+[logger]
+# Keep Streamlit's own logger at WARNING to reduce noise in the app logs.
+level = "warning"

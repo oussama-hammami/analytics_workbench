@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"unsafe_allow_html\" /home/oussama/Downloads/analytics_workbench/admin/*.py)",
+      "Bash(python3 -)",
+      "Bash(python3 -c ':*)"
+    ]
+  }
+}

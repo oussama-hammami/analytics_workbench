@@ -74,9 +74,58 @@ def get_db() -> Generator[Tuple, None, None]:
         conn.close()
 
 
+def _migrate_add_manager_role() -> None:
+    """Recreate aw_users with 'manager' in the role CHECK constraint if needed.
+
+    SQLite does not support ALTER TABLE … MODIFY COLUMN, so we use the
+    rename-copy-drop-rename pattern recommended by the SQLite docs.
+    This is a no-op when the current schema already includes 'manager'.
+    """
+    p = os.getenv("DB_PREFIX", "aw_")
+    with get_db() as (conn, cur):
+        cur.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            (f"{p}users",),
+        )
+        row = cur.fetchone()
+        if not row or "manager" in (row[0] or ""):
+            return  # already migrated or table doesn't exist yet
+
+        conn.executescript(f"""
+            PRAGMA foreign_keys = OFF;
+
+            CREATE TABLE "{p}users_new" (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT    NOT NULL,
+                email      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+                password   TEXT    NOT NULL,
+                role       TEXT    NOT NULL DEFAULT 'viewer'
+                           CHECK(role IN ('superadmin','admin','manager','viewer')),
+                is_active  INTEGER NOT NULL DEFAULT 1,
+                last_login TEXT,
+                created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
+            INSERT INTO "{p}users_new"
+                SELECT id, name, email, password, role, is_active,
+                       last_login, created_at, updated_at
+                FROM "{p}users";
+
+            DROP TABLE "{p}users";
+            ALTER TABLE "{p}users_new" RENAME TO "{p}users";
+
+            PRAGMA foreign_keys = ON;
+        """)
+
+
 def ensure_admin_schema() -> None:
     """Create all admin tables (idempotent)."""
     p = os.getenv("DB_PREFIX", "aw_")
+
+    # Migrate existing databases that pre-date the 'manager' role.
+    _migrate_add_manager_role()
+
     with get_db() as (conn, _):
         conn.executescript(f"""
             CREATE TABLE IF NOT EXISTS "{p}users" (
@@ -85,7 +134,7 @@ def ensure_admin_schema() -> None:
                 email      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
                 password   TEXT    NOT NULL,
                 role       TEXT    NOT NULL DEFAULT 'viewer'
-                           CHECK(role IN ('superadmin','admin','viewer')),
+                           CHECK(role IN ('superadmin','admin','manager','viewer')),
                 is_active  INTEGER NOT NULL DEFAULT 1,
                 last_login TEXT,
                 created_at TEXT    NOT NULL DEFAULT (datetime('now')),

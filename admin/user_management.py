@@ -7,15 +7,24 @@ import re
 from typing import Optional
 
 import streamlit as st
-from .auth import require_admin, _hash_password, get_current_user, ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_VIEWER
+from .auth import (
+    require_admin, _hash_password, get_current_user,
+    ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_MANAGER, ROLE_VIEWER,
+    get_csrf_token, validate_csrf_token,
+)
 from .db import get_db, table
 
-_ROLES = [ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_VIEWER]
+# All roles in privilege order (highest first).
+_ROLES = [ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_MANAGER, ROLE_VIEWER]
 _ROLE_BADGE = {
     ROLE_SUPERADMIN: "🔴 Superadmin",
     ROLE_ADMIN:      "🟡 Admin",
+    ROLE_MANAGER:    "🔵 Manager",
     ROLE_VIEWER:     "🟢 Viewer",
 }
+
+# Roles a non-superadmin admin may assign.
+_ADMIN_ASSIGNABLE_ROLES = [ROLE_MANAGER, ROLE_VIEWER]
 
 
 def _valid_email(v: str) -> bool:
@@ -109,13 +118,15 @@ def render_user_management() -> None:
 
     users = _fetch_users()
 
-    total  = len(users)
-    active = sum(1 for u in users if u["is_active"])
-    admins = sum(1 for u in users if u["role"] in (ROLE_SUPERADMIN, ROLE_ADMIN))
-    c1, c2, c3 = st.columns(3)
+    total    = len(users)
+    active   = sum(1 for u in users if u["is_active"])
+    admins   = sum(1 for u in users if u["role"] in (ROLE_SUPERADMIN, ROLE_ADMIN))
+    managers = sum(1 for u in users if u["role"] == ROLE_MANAGER)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Users", total)
     c2.metric("Active",      active)
     c3.metric("Admins",      admins)
+    c4.metric("Managers",    managers)
     st.markdown("---")
 
     st.subheader("All Users")
@@ -162,11 +173,16 @@ def render_user_management() -> None:
             # ── Inline edit ─────────────────────────────────────────────────
             if st.session_state.get(f"edit_open_{uid}"):
                 with st.expander(f"✏️  Editing: {user['name']}", expanded=True):
+                    _csrf = get_csrf_token()
+                    _edit_roles = _ROLES if is_superadmin else _ADMIN_ASSIGNABLE_ROLES
+                    _role_idx = (
+                        _edit_roles.index(user["role"])
+                        if user["role"] in _edit_roles else len(_edit_roles) - 1
+                    )
                     with st.form(key=f"edit_form_{uid}"):
                         e_name  = st.text_input("Name",  value=user["name"])
                         e_email = st.text_input("Email", value=user["email"])
-                        e_role  = st.selectbox("Role", _ROLES,
-                                               index=_ROLES.index(user["role"]) if user["role"] in _ROLES else 2,
+                        e_role  = st.selectbox("Role", _edit_roles, index=_role_idx,
                                                disabled=not is_superadmin)
                         st.markdown("**Reset Password** *(blank = keep current)*")
                         new_pw  = st.text_input("New Password",     type="password")
@@ -175,6 +191,9 @@ def render_user_management() -> None:
                         cancel = st.columns([1,1,4])[1].form_submit_button("✖ Cancel")
 
                     if save:
+                        if not validate_csrf_token(_csrf):
+                            st.error("Session error — please refresh and try again.")
+                            st.stop()
                         errs = []
                         if not e_name.strip(): errs.append("Name cannot be empty.")
                         if not _valid_email(e_email): errs.append("Email cannot be empty.")
@@ -213,6 +232,8 @@ def render_user_management() -> None:
     # ── Create New User ───────────────────────────────────────────────────────
     st.markdown("---")
     st.subheader("➕ Create New User")
+    _create_csrf = get_csrf_token()
+    _create_roles = _ROLES if is_superadmin else _ADMIN_ASSIGNABLE_ROLES
     with st.form("create_user_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         n_name  = c1.text_input("Full Name",  placeholder="Jane Smith")
@@ -220,10 +241,13 @@ def render_user_management() -> None:
         c3, c4  = st.columns(2)
         n_pw    = c3.text_input("Password", type="password")
         n_pw2   = c4.text_input("Confirm Password", type="password")
-        n_role  = st.selectbox("Role", _ROLES if is_superadmin else [ROLE_ADMIN, ROLE_VIEWER], index=2)
+        n_role  = st.selectbox("Role", _create_roles, index=len(_create_roles) - 1)
         submitted = st.form_submit_button("Create User", type="primary")
 
     if submitted:
+        if not validate_csrf_token(_create_csrf):
+            st.error("Session error — please refresh and try again.")
+            st.stop()
         errs = []
         if not n_name.strip():       errs.append("Name is required.")
         if not _valid_email(n_email): errs.append("Email/username is required.")
